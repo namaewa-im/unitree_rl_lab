@@ -12,7 +12,13 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sensors import ContactSensorCfg, RayCasterCfg, patterns
+from isaaclab.sensors import ContactSensorCfg, patterns
+
+# 일부 IsaacLab 버전에서는 RayCasterCfg 가 제공되지 않을 수 있으므로, 선택적으로 import 한다.
+try:  # pragma: no cover - 다양한 IsaacLab 버전에 대응하기 위한 방어 코드
+    from isaaclab.sensors import RayCasterCfg
+except Exception:  # noqa: BLE001
+    RayCasterCfg = None
 from isaaclab.terrains import TerrainImporterCfg
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR, ISAACLAB_NUCLEUS_DIR
@@ -93,14 +99,18 @@ class RobotSceneCfg(InteractiveSceneCfg):
     robot: ArticulationCfg = ROBOT_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     # sensors
-    height_scanner = RayCasterCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/base",
-        offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
-        ray_alignment="yaw",
-        pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
-        debug_vis=False,
-        mesh_prim_paths=["/World/ground"],
-    )
+    # 일부 빌드에서는 RayCasterCfg 가 없으므로, 이런 경우 height_scanner 를 비활성화한다.
+    if RayCasterCfg is not None:
+        height_scanner = RayCasterCfg(
+            prim_path="{ENV_REGEX_NS}/Robot/base",
+            offset=RayCasterCfg.OffsetCfg(pos=(0.0, 0.0, 20.0)),
+            ray_alignment="yaw",
+            pattern_cfg=patterns.GridPatternCfg(resolution=0.1, size=[1.6, 1.0]),
+            debug_vis=False,
+            mesh_prim_paths=["/World/ground"],
+        )
+    else:
+        height_scanner = None
     contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True)
     # lights
     sky_light = AssetBaseCfg(
@@ -393,7 +403,8 @@ class RobotEnvCfg(ManagerBasedRLEnvCfg):
         # update sensor update periods
         # we tick all the sensors based on the smallest update period (physics update period)
         self.scene.contact_forces.update_period = self.sim.dt
-        self.scene.height_scanner.update_period = self.decimation * self.sim.dt
+        if self.scene.height_scanner is not None:
+            self.scene.height_scanner.update_period = self.decimation * self.sim.dt
 
         # check if terrain levels curriculum is enabled - if so, enable curriculum for terrain generator
         # this generates terrains with increasing difficulty and is useful for training

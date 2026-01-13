@@ -115,9 +115,28 @@ REGISTER_OBSERVATION(velocity_commands)
 
     const auto cfg = env->cfg["commands"]["base_velocity"]["ranges"];
 
-    obs[0] = std::clamp(joystick->ly(), cfg["lin_vel_x"][0].as<float>(), cfg["lin_vel_x"][1].as<float>());
-    obs[1] = std::clamp(-joystick->lx(), cfg["lin_vel_y"][0].as<float>(), cfg["lin_vel_y"][1].as<float>());
-    obs[2] = std::clamp(-joystick->rx(), cfg["ang_vel_z"][0].as<float>(), cfg["ang_vel_z"][1].as<float>());
+    // 방향키 사용: up/down/left/right
+    float lin_vel_x = 0.0f;
+    float lin_vel_y = 0.0f;
+    float ang_vel_z = 0.0f;
+
+    // 전진/후진 (up/down)
+    if (joystick->up.pressed) {
+        lin_vel_x = cfg["lin_vel_x"][1].as<float>(); // 최대 전진 속도
+    } else if (joystick->down.pressed) {
+        lin_vel_x = cfg["lin_vel_x"][0].as<float>(); // 최대 후진 속도
+    }
+
+    // 좌/우 회전 (left/right)
+    if (joystick->left.pressed) {
+        ang_vel_z = cfg["ang_vel_z"][1].as<float>(); // 좌회전 (양수)
+    } else if (joystick->right.pressed) {
+        ang_vel_z = cfg["ang_vel_z"][0].as<float>(); // 우회전 (음수)
+    }
+
+    obs[0] = lin_vel_x;
+    obs[1] = lin_vel_y;
+    obs[2] = ang_vel_z;
 
     return obs;
 }

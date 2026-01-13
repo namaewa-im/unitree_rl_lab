@@ -95,13 +95,18 @@ from datetime import datetime
 from rsl_rl.runners import OnPolicyRunner  # TODO: Consider printing the experiment name in the terminal.
 
 import isaaclab_tasks  # noqa: F401
-from isaaclab.envs import (
-    DirectMARLEnv,
-    DirectMARLEnvCfg,
-    DirectRLEnvCfg,
-    ManagerBasedRLEnvCfg,
-    multi_agent_to_single_agent,
-)
+from isaaclab.envs import DirectRLEnvCfg, ManagerBasedRLEnvCfg
+
+# IsaacLab 4.0.0 (and some packaged builds) may not ship MARL helpers yet.
+# Fall back gracefully so single-agent tasks can still run.
+try:  # pragma: no cover - defensive for mixed IsaacLab versions
+    from isaaclab.envs import DirectMARLEnv, DirectMARLEnvCfg, multi_agent_to_single_agent
+except Exception:  # noqa: BLE001
+    DirectMARLEnv = None
+    DirectMARLEnvCfg = None
+
+    def multi_agent_to_single_agent(env):
+        return env
 from isaaclab.utils.dict import print_dict
 from isaaclab.utils.io import dump_yaml
 from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper
@@ -158,7 +163,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
 
     # convert to single-agent instance if required by the RL algorithm
-    if isinstance(env.unwrapped, DirectMARLEnv):
+    if DirectMARLEnv is not None and isinstance(env.unwrapped, DirectMARLEnv):
         env = multi_agent_to_single_agent(env)
 
     # save resume path before creating a new log_dir
